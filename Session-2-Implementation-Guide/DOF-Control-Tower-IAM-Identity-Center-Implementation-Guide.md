@@ -442,6 +442,205 @@ Root (r-7u73)
 
 ## Part 2: IAM Identity Center Configuration
 
+### Understanding IAM Identity Center Concepts
+
+Before configuring, it's important to understand how the key components work together.
+
+> **References:**
+> - [What is IAM Identity Center?](https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html)
+> - [IAM Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+> - [Control Tower - User groups, roles, and permission sets](https://docs.aws.amazon.com/controltower/latest/userguide/user-groups-roles-permissions.html)
+> - [Manage AWS accounts with permission sets](https://docs.aws.amazon.com/singlesignon/latest/userguide/permissionsetsconcept.html)
+
+#### What is IAM Identity Center?
+
+IAM Identity Center (formerly AWS SSO) is the **recommended way** to manage human user access across multiple AWS accounts. Instead of creating separate IAM users in each account, you create users once in Identity Center and assign them access to multiple accounts through a single sign-on portal.
+
+**How it works:**
+```
+User logs into AWS Access Portal (single URL)
+    → Sees list of accounts they have access to
+    → Selects an account + role
+    → Gets temporary credentials (auto-expires)
+    → Works in that account
+```
+
+**Why it's better than IAM Users:**
+- One login for all accounts (no remembering multiple passwords)
+- Temporary credentials (auto-expire, more secure)
+- Centralized management (add/remove access from one place)
+- MFA enforced centrally
+- Audit trail of who accessed what
+
+#### Key Concepts Explained
+
+**1. Users**
+- A person who needs access to AWS accounts
+- Created in Identity Center's identity store (or synced from Active Directory)
+- Has a username, email, first/last name
+- Logs in via the AWS Access Portal URL
+
+**DOF Example:** Sir Dennis, developers, operations staff — each gets one Identity Center user.
+
+**2. Groups**
+- A collection of users who share the same access needs
+- Users inherit all permissions assigned to their group(s)
+- A user can belong to multiple groups
+- Manage access by adding/removing users from groups (not by editing individual permissions)
+
+**DOF Example:** `DOF-Administrators`, `DOF-Developers`, `DOF-Operations`
+
+**Why use Groups instead of assigning directly to Users?**
+- When a new developer joins → just add them to `DOF-Developers` group
+- When someone leaves → just remove them from the group
+- No need to reconfigure permissions for each individual
+
+**3. Permission Sets**
+- A template that defines **what level of access** a user gets inside an account
+- Contains one or more IAM policies (AWS managed or custom)
+- When assigned, Identity Center automatically creates an IAM Role in the target account
+- Has a session duration (how long the user stays logged in)
+
+**DOF Example:** `AdministratorAccess` (full admin), `PowerUserAccess` (dev without IAM), `ReadOnlyAccess` (view only)
+
+**Types of Permission Sets:**
+
+| Type | Description | When to Use |
+|------|-------------|-------------|
+| **Predefined** | Uses a single AWS managed policy (e.g., `AdministratorAccess`) | Quick setup, common job functions |
+| **Custom** | Combines multiple AWS managed + custom policies | Specific access needs (e.g., EC2 + RDS only) |
+
+**4. Roles (created automatically)**
+- When you assign a Permission Set to a Group for an Account, Identity Center **automatically creates an IAM Role** in that account
+- Users don't manage roles directly — they select a permission set in the Access Portal, and Identity Center assumes the role on their behalf
+- The role provides **temporary credentials** that expire after the session duration
+
+**Flow:**
+```
+Group (DOF-Operations)
+  + Permission Set (OperationsAccess)
+  + Account (DOF-Production)
+  = IAM Role auto-created in DOF-Production account
+  = Users in DOF-Operations can assume that role via Access Portal
+```
+
+**5. Account Assignments**
+- The glue that connects everything: **Group + Permission Set + Account**
+- One assignment = "This group gets this level of access to this account"
+- You can have multiple assignments per group (different permission sets for different accounts)
+
+**DOF Example:**
+```
+DOF-Developers + PowerUserAccess + DOF-Development  = Devs can do everything (except IAM) in Dev
+DOF-Developers + PowerUserAccess + DOF-Staging      = Devs can do everything (except IAM) in Staging
+DOF-Developers + (no assignment)  + DOF-Production   = Devs CANNOT access Production ✅
+```
+
+**6. AWS Access Portal**
+- A web URL where users log in (e.g., `https://dof.awsapps.com/start`)
+- After login, users see all accounts and roles they have access to
+- Click an account → choose a role → get console access or CLI credentials
+- Single place for all AWS access
+
+#### How Everything Connects (Visual)
+
+```
+┌─────────────────────────────────────────────────────┐
+│              IAM IDENTITY CENTER                     │
+│                                                      │
+│  USERS ──belong to──► GROUPS                        │
+│                          │                           │
+│                    assigned with                      │
+│                          │                           │
+│               PERMISSION SETS (what access)          │
+│                          │                           │
+│                    assigned to                        │
+│                          │                           │
+│                  AWS ACCOUNTS (where)                │
+│                          │                           │
+│                    auto-creates                       │
+│                          ▼                           │
+│                    IAM ROLES                         │
+│              (temporary credentials)                 │
+└─────────────────────────────────────────────────────┘
+
+User logs into Access Portal
+  → Sees accounts/roles available
+  → Selects one → Gets temporary credentials
+  → Works in that account with those permissions
+```
+
+### IAM Identity Center Best Practices (from AWS Documentation)
+
+#### 1. Use Federation — Never Create IAM Users for People
+AWS recommends using IAM Identity Center for all human access. IAM users should only exist as emergency "break-glass" accounts.
+
+> *"Require your human users to use temporary credentials when accessing AWS. For centralized access management, we recommend that you use AWS IAM Identity Center."*
+> — [IAM Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+
+**DOF Action:** Remove legacy IAM users after Identity Center is verified working. Keep one break-glass user per account.
+
+#### 2. Apply Least-Privilege Permissions
+Start with predefined permission sets, then refine over time using IAM Access Analyzer.
+
+> *"After you create an administrative permission set, create a more restrictive permission set. Your administrative user should also be assigned additional, more restrictive permission sets so they can access accounts with only the permissions required."*
+> — [IAM Identity Center - Permission Sets](https://docs.aws.amazon.com/singlesignon/latest/userguide/permissionsetsconcept.html)
+
+**DOF Action:**
+- Admins should use `PowerUserAccess` for daily work, `AdministratorAccess` only when needed
+- Assign multiple permission sets per user — always choose the most restrictive one for the task
+
+#### 3. Require MFA for All Users
+Enable MFA in Identity Center settings. AWS recommends phishing-resistant MFA (passkeys, security keys) where possible.
+
+> *"Require MFA for additional security. We recommend that you use phishing-resistant MFA such as passkeys and security keys wherever possible."*
+> — [IAM Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+
+**DOF Action:** Enable MFA requirement in Identity Center → Settings → Authentication → MFA → "Every time they sign in"
+
+#### 4. Use Groups — Never Assign Permissions Directly to Users
+Always assign permission sets to groups, then add users to groups. This makes onboarding/offboarding simple.
+
+> *"User groups manage specialized roles. All members of a group inherit the permission sets associated with the group. Create new groups so you can custom-assign only the roles needed for specific tasks."*
+> — [AWS Control Tower - User groups, roles, and permission sets](https://docs.aws.amazon.com/controltower/latest/userguide/user-groups-roles-permissions.html)
+
+**DOF Action:** Never assign a permission set directly to a user. Always go through a group.
+
+#### 5. Use SCPs as Guardrails Alongside Permission Sets
+Permission sets define what users CAN do. SCPs define what NOBODY can do (even admins).
+
+> *"Use AWS Organizations SCPs to establish permissions guardrails to control access for all principals across your accounts. SCPs alone are insufficient to grant permissions — they only restrict."*
+> — [IAM Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+
+**DOF Action:** Control Tower guardrails (SCPs) + Identity Center permission sets = defense in depth.
+
+#### 6. Regularly Review and Remove Unused Access
+Periodically audit who has access and remove what's no longer needed.
+
+> *"IAM provides last accessed information to help you identify users, roles, permissions, policies, and credentials you no longer need so you can remove them."*
+> — [IAM Security Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+
+**DOF Action:** Schedule quarterly access reviews. Check Identity Center for inactive users.
+
+#### 7. Set Appropriate Session Durations
+Shorter sessions = more secure. Longer sessions = more convenient.
+
+| Permission Set | Recommended Session Duration | Why |
+|---------------|------------------------------|-----|
+| AdministratorAccess | 1-4 hours | High privilege, limit exposure |
+| PowerUserAccess | 4-8 hours | Daily dev work |
+| ReadOnlyAccess | 4-8 hours | Low risk, convenience |
+| OperationsAccess | 4-8 hours | Daily ops work |
+| SecurityAuditAccess | 4 hours | Sensitive data access |
+
+#### 8. Don't Delete Your Identity Center Configuration
+> ⚠️ *"AWS Control Tower sets up your IAM Identity Center directory in your home Region. Do not delete your IAM Identity Center configuration in your home Region."*
+> — [AWS Control Tower Documentation](https://docs.aws.amazon.com/controltower/latest/userguide/user-groups-roles-permissions.html)
+
+**DOF Action:** Identity Center is in `ap-southeast-2` (Sydney). Never delete or reconfigure it.
+
+---
+
 ### Step 1: Verify IAM Identity Center is Enabled
 
 ```bash
