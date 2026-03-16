@@ -88,27 +88,36 @@ If DOF grows to many more applications in the future, you can migrate to Approac
 
 ### Resource Naming Convention (Inside Accounts)
 
-For resources within each account, use this pattern:
-
+**Pattern:**
 ```
-{Environment}-{Org}-{ResourceType}-{System/WebApp}-{Purpose}-{Sequence}
+{Client}-{System}-{Environment}-{Resource}
 ```
 
-**Examples (based on DOF's existing EC2 instances):**
+| Component | Description | Values |
+|-----------|-------------|--------|
+| `{Client}` | Organization | `DOF` |
+| `{System}` | Application/workload name | `DOFWEB`, `B2BI`, `OreTool`, `TES`, `GCF` |
+| `{Environment}` | Lifecycle stage | `PROD`, `STAGING`, `DEV` |
+| `{Resource}` | AWS resource type + purpose | `EC2-APP-01`, `RDS-01`, `S3-ASSETS`, `EBS-01` |
 
-| Current Name | Follows Convention? | Recommended Name |
-|-------------|-------------------|-----------------|
-| `PROD-DOF-EC2-DOFWEB-APP-01` | ✅ Yes | Keep as-is |
-| `PROD-DOF-EC2-DOFWEB-DB-01` | ✅ Yes | Keep as-is |
-| `PROD-DOF-EC2-ASW-B2BI-APP-01` | ✅ Yes | Keep as-is |
-| `PROD-DOF-EC2-ASW-B2BI-DB-01` | ✅ Yes | Keep as-is |
-| `PROD-DOF-EC2-ORETOOL-01` | ✅ Yes | Keep as-is |
-| `PROD-DOF-EC2-TESDB-01` | ⚠️ Missing type | `PROD-DOF-EC2-TES-DB-01` |
-| `PROD-DOF-EC2-GCF-Server` | ⚠️ Inconsistent | `PROD-DOF-EC2-GCF-APP-01` |
-| `UAT-DOF-EC2-ASW-B2BI-APP-01` | ✅ Yes | Keep as-is |
-| `DEV-DOF-EC2-TES-APP-01` | ✅ Yes | Keep as-is |
+**Examples:**
 
-DOF's existing EC2 naming is already well-structured. Only minor inconsistencies to fix.
+| Resource | Name |
+|----------|------|
+| EC2 (DOFWEB App Server) | `DOF-DOFWEB-PROD-EC2-APP-01` |
+| EC2 (DOFWEB DB Server) | `DOF-DOFWEB-PROD-EC2-DB-01` |
+| EC2 (B2BI App Server) | `DOF-B2BI-PROD-EC2-APP-01` |
+| EC2 (B2BI DB Server) | `DOF-B2BI-PROD-EC2-DB-01` |
+| EC2 (OreTool) | `DOF-ORETOOL-PROD-EC2-APP-01` |
+| EC2 (TES DB) | `DOF-TES-PROD-EC2-DB-01` |
+| EC2 (GCF Server) | `DOF-GCF-PROD-EC2-APP-01` |
+| RDS (DOFWEB) | `DOF-DOFWEB-PROD-RDS-01` |
+| S3 (DOFWEB Assets) | `dof-dofweb-prod-s3-assets` |
+| EBS Volume | `DOF-DOFWEB-PROD-EBS-01` |
+| EC2 (B2BI Staging) | `DOF-B2BI-STAGING-EC2-APP-01` |
+| EC2 (TES Dev) | `DOF-TES-DEV-EC2-APP-01` |
+
+> **Note:** S3 bucket names must be lowercase and globally unique, so use lowercase format: `dof-{system}-{env}-s3-{purpose}`
 
 ### Email Convention for New Accounts
 
