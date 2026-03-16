@@ -18,6 +18,122 @@
 
 ---
 
+## AWS Account & Resource Naming Convention
+
+### Why Naming Matters (AWS Well-Architected & Multi-Account Best Practices)
+
+Per the AWS whitepaper *"Organizing Your AWS Environment Using Multiple Accounts"* and the Well-Architected Framework (COST02-BP03), account naming should:
+- Clearly identify the **organization**, **workload/system**, and **environment**
+- Enable quick identification in billing, CloudTrail logs, and IAM Identity Center
+- Support cost allocation and governance at scale
+- Be consistent across all accounts and resources
+
+> **References:**
+> - [COST02-BP03 Implement an account structure](https://docs.aws.amazon.com/wellarchitected/2023-10-03/framework/cost_govern_usage_account_structure.html)
+> - [Organizing Your AWS Environment - Application OUs](https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/application-ous.html)
+> - [AWS Control Tower multi-account strategy](https://docs.aws.amazon.com/controltower/latest/userguide/aws-multi-account-landing-zone.html)
+
+### Recommended Pattern
+
+```
+{Org}-{System/WebApp}-{Environment}
+```
+
+| Component | Description | Examples |
+|-----------|-------------|---------|
+| `{Org}` | Organization abbreviation | `DOF` |
+| `{System/WebApp}` | Application or workload name | `DOFWEB`, `B2BI`, `OreTool`, `TES`, `GCF` |
+| `{Environment}` | Lifecycle stage | `Prod`, `Staging`, `Dev` |
+
+### DOF Account Naming Convention
+
+| Account | Naming Pattern | Account Name |
+|---------|---------------|-------------|
+| Management | `{Org}-Management` | `DOF-Management` (currently RadentaDOF) |
+| Log Archive | *(AWS default - keep as-is)* | `Log Archive` |
+| Audit | *(AWS default - keep as-is)* | `Audit` |
+| Operations | `{Org}-Operations` | `DOF-Operations` (currently Operations) |
+| Production | `{Org}-{System}-Prod` | `DOF-DOFWEB-Prod` or `DOF-Production` |
+| Staging | `{Org}-{System}-Staging` | `DOF-DOFWEB-Staging` or `DOF-Staging` |
+| Development | `{Org}-{System}-Dev` | `DOF-DOFWEB-Dev` or `DOF-Development` |
+
+### Two Approaches for DOF
+
+**Approach A: One Account Per Environment (Current Plan - 7 Accounts)**
+
+All workloads share the same account per environment. Simpler, good for DOF's current size.
+
+```
+DOF-Production      ← All prod workloads (DOFWEB, B2BI, OreTool, TES, GCF)
+DOF-Staging         ← All staging workloads
+DOF-Development     ← All dev workloads
+```
+
+**Approach B: One Account Per Workload Per Environment (Future Scale)**
+
+Each workload gets its own account per environment. Better isolation, but more accounts.
+
+```
+DOF-DOFWEB-Prod     ← DOFWEB production only
+DOF-B2BI-Prod       ← B2BI production only
+DOF-DOFWEB-Staging  ← DOFWEB staging only
+DOF-DOFWEB-Dev      ← DOFWEB development only
+```
+
+### ✅ Recommendation for DOF
+
+**Start with Approach A** (environment-based accounts) — this aligns with Option 2's 7-account structure and DOF's current workload size. The AWS whitepaper recommends separating production from non-production environments as the primary separation, with per-workload accounts as an advanced pattern when you scale.
+
+If DOF grows to many more applications in the future, you can migrate to Approach B by creating additional accounts under the same OUs.
+
+### Resource Naming Convention (Inside Accounts)
+
+For resources within each account, use this pattern:
+
+```
+{Environment}-{Org}-{ResourceType}-{System/WebApp}-{Purpose}-{Sequence}
+```
+
+**Examples (based on DOF's existing EC2 instances):**
+
+| Current Name | Follows Convention? | Recommended Name |
+|-------------|-------------------|-----------------|
+| `PROD-DOF-EC2-DOFWEB-APP-01` | ✅ Yes | Keep as-is |
+| `PROD-DOF-EC2-DOFWEB-DB-01` | ✅ Yes | Keep as-is |
+| `PROD-DOF-EC2-ASW-B2BI-APP-01` | ✅ Yes | Keep as-is |
+| `PROD-DOF-EC2-ASW-B2BI-DB-01` | ✅ Yes | Keep as-is |
+| `PROD-DOF-EC2-ORETOOL-01` | ✅ Yes | Keep as-is |
+| `PROD-DOF-EC2-TESDB-01` | ⚠️ Missing type | `PROD-DOF-EC2-TES-DB-01` |
+| `PROD-DOF-EC2-GCF-Server` | ⚠️ Inconsistent | `PROD-DOF-EC2-GCF-APP-01` |
+| `UAT-DOF-EC2-ASW-B2BI-APP-01` | ✅ Yes | Keep as-is |
+| `DEV-DOF-EC2-TES-APP-01` | ✅ Yes | Keep as-is |
+
+DOF's existing EC2 naming is already well-structured. Only minor inconsistencies to fix.
+
+### Email Convention for New Accounts
+
+```
+DOF-Staging:      aws+dof-staging@<domain>
+DOF-Development:  aws+dof-development@<domain>
+```
+
+Using the `+` alias trick routes all emails to the same `aws@<domain>` inbox.
+
+### Tagging Strategy (Complements Naming)
+
+Apply these tags to all resources for cost allocation and governance:
+
+| Tag Key | Example Value | Purpose |
+|---------|-------------|---------|
+| `Organization` | `DOF` | Cost allocation |
+| `Environment` | `Production` / `Staging` / `Development` | Environment identification |
+| `System` | `DOFWEB` / `B2BI` / `OreTool` | Workload identification |
+| `Owner` | `DOF-Infrastructure` | Accountability |
+| `CostCenter` | `DOF-IT` | Billing |
+| `ManagedBy` | `Sagesoft` / `DOF` | Support routing |
+
+---
+
 ## Pre-Implementation Checklist
 
 - [ ] Management account access confirmed (239423589015)
