@@ -946,7 +946,71 @@ Enable in DOF-Staging and DOF-Development after account creation.
 
 ---
 
-## Validation Checklist
+## Part 4: WAF Pillar Updates After Implementation
+
+This Control Tower + IAM Identity Center implementation directly addresses the following WAF findings. Update these in the AWS Well-Architected Tool after completing the implementation.
+
+### Security Pillar Updates
+
+| WAF Question | Current Risk | What This Implementation Fixes | New Status |
+|-------------|-------------|-------------------------------|------------|
+| **SEC 1** - How do you securely operate your workload? | 🔴 HIGH | Control Tower guardrails enforce security policies across all accounts. SCPs prevent dangerous actions. Security Hub enabled for centralized findings. | 🟡 MEDIUM |
+| **SEC 2** - How do you manage identities for people and machines? | 🔴 HIGH | IAM Identity Center replaces IAM users. Centralized identity management. Users created once, access multiple accounts. Federation with temporary credentials. | 🟢 IMPROVED |
+| **SEC 3** - How do you manage permissions for people and machines? | 🟡 MEDIUM | Permission sets enforce least-privilege. Groups control access by role. Account-level isolation (Prod/Staging/Dev). SCPs as guardrails. Regular access reviews planned. | 🟢 IMPROVED |
+| **SEC 5** - How do you protect your network resources? | 🟡 MEDIUM | Account separation provides network isolation between environments. Production account isolated from Development. | 🟡 MEDIUM (partial) |
+| **SEC 6** - How do you protect your compute resources? | 🟡 MEDIUM | Environment separation prevents dev changes from affecting production. Strict guardrails on Production OU. | 🟡 MEDIUM (partial) |
+| **SEC 10** - How do you anticipate, respond to, and recover from incidents? | 🔴 HIGH | Security Hub aggregates findings. GuardDuty in Audit account. Centralized logging in Log Archive. Incident visibility improved. | 🟡 MEDIUM |
+| **SEC 11** - How do you incorporate security in application lifecycle? | 🔴 HIGH | Environment separation (Dev → Staging → Prod) enforces lifecycle stages. Different guardrails per environment. | 🟡 MEDIUM |
+
+### Reliability Pillar Updates
+
+| WAF Question | Current Risk | What This Implementation Fixes | New Status |
+|-------------|-------------|-------------------------------|------------|
+| **REL 1** - No service quotas and constraints management | 🔴 HIGH | Separate accounts per environment = separate service quotas. Production won't be affected by dev resource consumption. | 🟡 MEDIUM |
+| **REL 2** - No network topology planning | 🔴 HIGH | Account-level isolation provides network boundaries. Each account has its own VPCs. | 🟡 MEDIUM (partial) |
+| **REL 3** - No workload service architecture design | 🔴 HIGH | Multi-account architecture defines clear workload boundaries. Production, Staging, Development separated. | 🟡 MEDIUM (partial) |
+| **REL 10** - No fault isolation to protect workload | 🔴 HIGH | Account separation = blast radius containment. A failure in Dev cannot impact Production. This is the #1 AWS recommendation for fault isolation. | 🟢 IMPROVED |
+
+### Summary of Impact
+
+| Pillar | Questions Addressed | HIGH→IMPROVED | HIGH→MEDIUM | MEDIUM→IMPROVED |
+|--------|-------------------|---------------|-------------|-----------------|
+| **Security** | 7 of 11 | SEC 2 | SEC 1, 10, 11 | SEC 3 |
+| **Reliability** | 4 of 13 | REL 10 | REL 1, 2, 3 | — |
+| **Total** | **11 of 24** | **2** | **6** | **1** |
+
+### Questions NOT Addressed (Still Need Separate Work)
+
+**Security (still open):**
+| Question | Status | Needs |
+|----------|--------|-------|
+| SEC 7 - Data classification | 🔴 HIGH | Data classification policy + tagging |
+| SEC 8 - Data at rest protection | 🔴 HIGH | Encryption (EBS, S3, RDS) |
+
+**Reliability (still open):**
+| Question | Status | Needs |
+|----------|--------|-------|
+| REL 4 - Preventing failures in distributed systems | 🔴 HIGH | Architecture redesign |
+| REL 5 - Mitigating failures in distributed systems | 🔴 HIGH | Retry/circuit breaker patterns |
+| REL 6 - Workload resource monitoring | 🔴 HIGH | CloudWatch alarms + dashboards |
+| REL 7 - Adapt to demand changes | 🔴 HIGH | Auto-scaling configuration |
+| REL 8 - Change implementation process | 🔴 HIGH | CI/CD pipeline + change management |
+| REL 9 - Data backup strategy | 🔴 HIGH | AWS Backup (Phase 1 Week 2) |
+| REL 11 - Withstand component failures | 🔴 HIGH | Multi-AZ, redundancy |
+| REL 12 - Reliability testing | 🔴 HIGH | Game days, chaos engineering |
+| REL 13 - Disaster recovery plan | 🔴 HIGH | DR strategy + runbooks |
+
+### How to Update in WAF Tool
+
+1. Go to **AWS Well-Architected Tool** in the console
+2. Open the DOF workload review
+3. For each question above, update the answers:
+   - Add the implemented best practices as selected answers
+   - Add notes referencing the Control Tower + Identity Center implementation
+   - Mark improvement plan items as completed
+4. Save and generate updated report
+
+---
 
 ### Control Tower
 - [ ] Drift resolved (no warnings in console)
